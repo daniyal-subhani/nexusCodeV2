@@ -1,0 +1,44 @@
+{
+  "name": "nexus-core-v2",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r --workspace-root=false run build",
+    "dev": "pnpm -r --workspace-root=false run dev",
+    "lint": "eslint . --fix",
+    "lint:packages": "pnpm -r --workspace-root=false run lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit --composite false ",
+    "test": "pnpm -r --workspace-root=false run test",
+    "prepare": "husky",
+    "validate": "pnpm lint && pnpm lint:packages && pnpm format && pnpm format:check && pnpm typecheck && pnpm test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.22.0",
+      "onFail": "download"
+    }
+  },
+  "type": "module",
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.68.0",
+    "@typescript-eslint/parser": "^8.68.0",
+    "eslint": "^10.9.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
+    "prettier": "^3.9.6",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.12",
+    "typescript": "^5.7.3"
+  }
+}

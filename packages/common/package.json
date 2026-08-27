@@ -1,0 +1,15 @@
+{
+  "name": "@nexus/common",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "scripts": {
+    "lint": "eslint . --fix",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module"
+}

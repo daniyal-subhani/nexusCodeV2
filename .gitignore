@@ -1,0 +1,94 @@
+# ==========================================
+# Dependencies
+# ==========================================
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+*.log
+
+# ==========================================
+# Build & Output Directories
+# ==========================================
+dist/
+build/
+out/
+.tsup/
+*.tsbuildinfo
+
+# ==========================================
+# Environment & Secrets (NEVER COMMIT)
+# ==========================================
+.env
+.env.*
+!.env.example
+!.env.test.example
+secrets/
+*.pem
+*.key
+*.crt
+
+# ==========================================
+# Database & ORM
+# ==========================================
+# SQLite / Local DBs
+*.db
+*.sqlite
+*.sqlite-journal
+
+# Prisma / Drizzle / ORMs
+/prisma/migrations/
+/prisma/dev.db
+/drizzle/migrations/
+
+# ==========================================
+# Testing & Coverage
+# ==========================================
+coverage/
+.nyc_output/
+*.lcov
+.vitest/
+.jest/
+
+# ==========================================
+# IDEs, Editors & System Files
+# ==========================================
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# macOS / Linux / Windows System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==========================================
+# Docker & Microservice Artifacts
+# ==========================================
+.docker/
+docker-compose.override.yml
+*.tar
+
+# ==========================================
+# Cache Directories
+# ==========================================
+.cache/
+.eslintcache
+.prettiercache
+.husky/_
+
+# ==========================================
+# Temporary Files
+# ==========================================
+tmp/
+temp/
+*.tmp
+*.build 
