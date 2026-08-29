@@ -10,10 +10,12 @@
     "lint:packages": "pnpm -r --workspace-root=false run lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "format:packages": "pnpm -r --workspace-root=false run format",
     "typecheck": "tsc --noEmit --composite false ",
+    "typecheck:packages": "pnpm -r --workspace-root=false run typecheck",
     "test": "pnpm -r --workspace-root=false run test",
     "prepare": "husky",
-    "validate": "pnpm lint && pnpm lint:packages && pnpm format && pnpm format:check && pnpm typecheck && pnpm test"
+    "validate": "pnpm lint && pnpm lint:packages && pnpm format && pnpm format:check && pnpm format:packages && pnpm typecheck && pnpm typecheck:packages &&  pnpm test"
   },
   "keywords": [],
   "author": "",

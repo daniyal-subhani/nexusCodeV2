@@ -1,0 +1,22 @@
+{
+  "name": "@nexus-core-v2/chat-service",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "lint": "eslint . --fix",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@nexus/common": "workspace:*",
+    "pino": "^10.3.1",
+    "tsup": "^8.5.1"
+  }
+}

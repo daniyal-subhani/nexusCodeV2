@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -11,7 +11,6 @@
     "skipLibCheck": true,
     // "baseUrl": ".",
     "sourceMap": true,
-    "outDir": "dist",
     "types": ["node"]
   },
   "exclude": ["node_modules", "dist"]

@@ -264,6 +264,9 @@ importers:
       qs:
         specifier: ^6.15.3
         version: 6.15.3
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(tsx@4.23.12)(typescript@5.9.3)(yaml@2.9.0)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -283,6 +286,57 @@ importers:
       pino-pretty:
         specifier: ^13.1.3
         version: 13.1.3
+
+  services/auth-service:
+    dependencies:
+      '@nexus/common':
+        specifier: workspace:*
+        version: link:../../packages/common
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(tsx@4.23.12)(typescript@5.9.3)(yaml@2.9.0)
+
+  services/chat-service:
+    dependencies:
+      '@nexus/common':
+        specifier: workspace:*
+        version: link:../../packages/common
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(tsx@4.23.12)(typescript@5.9.3)(yaml@2.9.0)
+
+  services/gateway-service:
+    dependencies:
+      '@nexus/common':
+        specifier: workspace:*
+        version: link:../../packages/common
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(tsx@4.23.12)(typescript@5.9.3)(yaml@2.9.0)
+
+  services/user-service:
+    dependencies:
+      '@nexus/common':
+        specifier: workspace:*
+        version: link:../../packages/common
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(tsx@4.23.12)(typescript@5.9.3)(yaml@2.9.0)
 
 packages:
 
