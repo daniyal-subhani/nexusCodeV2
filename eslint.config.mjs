@@ -4,7 +4,14 @@ import tsparser from '@typescript-eslint/parser';
 
 export default [
   {
-    ignores: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/build/**', '**/coverage/**'],
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.next/**',
+      '**/build/**',
+      '**/coverage/**',
+      '**/prisma/schema.d.ts',
+    ],
   },
   eslint.configs.recommended,
   {

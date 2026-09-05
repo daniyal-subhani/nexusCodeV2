@@ -3,3 +3,5 @@ packages:
   - 'services/*'
 allowBuilds:
   esbuild: true
+  msgpackr-extract: true
+  workerd: true

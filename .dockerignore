@@ -1,0 +1,32 @@
+
+# dependencies - re-install fresh in img
+node_modules
+**/node_modules
+
+# build output - re-gen inside image
+**/dist
+**/.turbo
+
+#  version control
+.git
+.gitignore
+
+# secrets 
+.env
+**/.env 
+**/.env.*
+**/.env.example
+
+# editor/OS noise
+.vscode
+.idea
+.DS_Store
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# docs - no need at runtime
+**/*.md 
+docs
