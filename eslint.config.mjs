@@ -28,7 +28,7 @@ export default [
     },
     rules: {
       'no-undef': 'off',
-      'no-console': 'warn',
+      // 'no-console': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-module-boundary-types': 'off',
     },

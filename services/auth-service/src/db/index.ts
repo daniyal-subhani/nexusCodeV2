@@ -1,9 +1,17 @@
 import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/mysql2';
+import mysql from 'mysql2/promise';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   throw new Error('DATABASE URL is not defined in environment variables');
 }
 
-export const db = drizzle(connectionString);
+const poolConnection = mysql.createPool({
+  uri: connectionString,
+  waitForConnections: true,
+  connectionLimit: 10,
+  enableKeepAlive: true,
+});
+
+export const db = drizzle({ client: poolConnection });

@@ -17,12 +17,13 @@
   "dependencies": {
     "@nexus/common": "workspace:*",
     "dotenv": "^17.4.2",
-    "drizzle-orm": "1.0.0-rc.4",
-    "mysql2": "^3.24.2",
+    "drizzle-orm": "^0.45.2",
+    "mysql2": "^3.11.0",
     "pino": "^10.3.1",
     "tsup": "^8.5.1"
   },
   "devDependencies": {
+    "@types/node": "^26.3.0",
     "drizzle-kit": "1.0.0-rc.4",
     "tsx": "^4.23.12"
   }
