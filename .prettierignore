@@ -4,3 +4,7 @@ dist
 build
 coverage
 pnpm-lock.yaml
+.agents
+.claude
+.cursor
+.devin

@@ -4,3 +4,7 @@ prisma/ops.json linguist-generated
 prisma/migration.json linguist-generated
 migrations/snapshots/**/contract.json linguist-generated
 migrations/snapshots/**/contract.d.ts linguist-generated
+src/db/contract.json linguist-generated
+src/db/contract.d.ts linguist-generated
+src/db/ops.json linguist-generated
+src/db/migration.json linguist-generated

@@ -35,6 +35,7 @@ services:
       POSTGRES_DB: ${USER_DB_NAME}
       POSTGRES_USER: ${USER_DB_USER}
       POSTGRES_PASSWORD: ${USER_DB_PASSWORD}
+
     ports:
       - '${USER_DB_PORT}:5432'
     volumes:
@@ -72,6 +73,14 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+    networks:
+      - nexusCoreV2-network
+  adminer:
+    image: adminer:latest
+    container_name: nexusCoreV2-adminer
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
     networks:
       - nexusCoreV2-network
 

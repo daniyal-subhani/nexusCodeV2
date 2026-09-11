@@ -2,7 +2,7 @@
 
 
 model UserProfile {
-  id        String      @id
+  id        String      @id @default(uuid())
   email     String   @unique 
   firstName String? @map("first_name")
   lastName String?  @map("last_name")
@@ -12,9 +12,8 @@ model UserProfile {
  
   
   createdAt DateTime @default(now())  @map("created_at")
-  updatedAt DateTime @updatedAt()   @map("updated_at")
+  updatedAt DateTime @updatedAt   @map("updated_at")
 
-  @@index([email])
   @@map("user_profiles")
 }
 

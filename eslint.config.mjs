@@ -10,7 +10,15 @@ export default [
       '**/.next/**',
       '**/build/**',
       '**/coverage/**',
-      '**/prisma/schema.d.ts',
+
+      '**/src/db/contract.d.ts',
+      '**/src/db/contract.json',
+      '**/src/db.ts',
+
+      '**/.agents/**',
+      '**/.claude/**',
+      '**/.cursor/**',
+      '**/.devin/**',
     ],
   },
   eslint.configs.recommended,
@@ -34,6 +42,14 @@ export default [
     },
   },
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/.next/**'],
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/.next/**',
+      '.agents',
+      '.claude',
+      '.cursor',
+      '.devin',
+    ],
   },
 ];

@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "types": ["node"],
     "rootDir": "src",
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
@@ -11,8 +12,8 @@
     },
     "module": "preserve",
     "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "types": ["node"]
+    "resolveJsonModule": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "prisma.config.ts"]
 }

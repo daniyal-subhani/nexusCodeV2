@@ -9,7 +9,6 @@
     "typecheck": "tsc --noEmit",
     "build": "tsup",
     "dev": "tsup --watch",
-    "postinstall": "prisma skills sync || exit 0",
     "contract:emit": "prisma contract emit"
   },
   "keywords": [],
@@ -18,15 +17,14 @@
   "type": "module",
   "dependencies": {
     "@nexus/common": "workspace:*",
-    "@prisma/client": "^7.10.0",
-    "@prisma/orm-postgres": "8.0.0-rc.8",
+    "@prisma/orm-postgres": "8.0.0-rc.9",
     "dotenv": "^17.4.2",
     "pino": "^10.3.1",
     "tsup": "^8.5.1"
   },
   "devDependencies": {
     "@prisma/cli-engine": "0.2.3",
-    "@types/node": "^26.3.0",
-    "prisma": "8.0.0-rc.10"
+    "@types/node": "^26.5.0",
+    "prisma": "8.0.0-rc.13"
   }
 }

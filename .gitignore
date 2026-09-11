@@ -92,3 +92,17 @@ tmp/
 temp/
 *.tmp
 *.build 
+
+.agents
+.claude
+.cursor
+.devin
+# Prisma generated
+**/src/db/contract.d.ts
+**/src/db/contract.json
+
+# Prisma skills (auto-generated)
+.agents/
+.claude/
+.cursor/
+.devin/
