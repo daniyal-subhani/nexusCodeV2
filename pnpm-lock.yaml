@@ -298,6 +298,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@cloudflare/workers-types@5.20260908.1)(@electric-sql/pglite@0.3.15)(@libsql/client@0.17.4)(@prisma/client@7.10.0(typescript@5.9.3))(@types/pg@8.20.4)(mysql2@3.24.4(@types/node@26.5.0))(pg@8.22.0)
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
       mysql2:
         specifier: ^3.11.0
         version: 3.24.4(@types/node@26.5.0)
@@ -308,6 +311,9 @@ importers:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.28)(tsx@4.23.13)(typescript@5.9.3)(yaml@2.9.0)
     devDependencies:
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
       '@types/node':
         specifier: ^26.5.0
         version: 26.5.0
