@@ -66,4 +66,11 @@ export const authService = {
     });
     return { accessToken, refreshToken: rawRefresh, user };
   },
+  async logout(id:string) {
+    if(!id) {
+      throw new UnauthorizedError("Invalid Credientials")
+    }
+    await authRepository.clearCookies(id)
+    res.clearCookies(accessToken, refreshToken, "Cookies cleared!") 
+  }
 };

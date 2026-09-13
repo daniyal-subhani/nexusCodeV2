@@ -38,4 +38,7 @@ export const authRepository = {
       })
       .where(eq(auth.id, userId));
   },
+  logout: async (userId: string) => {
+    await db
+  }
 };
