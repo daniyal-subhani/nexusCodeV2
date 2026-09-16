@@ -10,7 +10,7 @@ export const authRepository = {
       where: eq(auth.email, email),
     }),
   findById: async (userId: string) => {
-    await db.query.auth.findFirst({
+    return await db.query.auth.findFirst({
       where: eq(auth.id, userId),
     });
   },
@@ -39,6 +39,20 @@ export const authRepository = {
       .where(eq(auth.id, userId));
   },
   logout: async (userId: string) => {
+    await db.update(auth).set({ isActive: false }).where(eq(auth.id, userId));
+  },
+  updatePassword: async (userId: string, newPass: string) => {
     await db
-  }
+      .update(auth)
+      .set({
+        passwordHash: newPass,
+      })
+      .where(eq(auth.id, userId));
+  },
+  resetPassword: async () => {
+    // write here logic for sending user to verification code.
+  },
+  setNewPassword: async () => {
+    // write logic for setting up new password!
+  },
 };

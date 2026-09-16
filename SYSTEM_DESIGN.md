@@ -61,10 +61,10 @@ flowchart TB
 
 ### 1.2 Sync vs Async Communication
 
-| Communication | When used | Mechanism | Why |
-|---|---|---|---|
-| Synchronous (REST/WS) | Client-facing requests that need an immediate response (login, fetch profile, send message) | HTTP via Gateway, Socket.IO for realtime | Client is waiting; latency must be low and errors must be surfaced immediately |
-| Asynchronous (events) | Cross-service side effects that don't block the caller (send welcome email, update search index, push notification) | RabbitMQ topic exchange | Decouples services — Auth doesn't need to know Notification exists; failures don't cascade to the user-facing request |
+| Communication         | When used                                                                                                           | Mechanism                                | Why                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Synchronous (REST/WS) | Client-facing requests that need an immediate response (login, fetch profile, send message)                         | HTTP via Gateway, Socket.IO for realtime | Client is waiting; latency must be low and errors must be surfaced immediately                                        |
+| Asynchronous (events) | Cross-service side effects that don't block the caller (send welcome email, update search index, push notification) | RabbitMQ topic exchange                  | Decouples services — Auth doesn't need to know Notification exists; failures don't cascade to the user-facing request |
 
 **Rule of thumb used throughout this design:** if the client needs the result to render the next screen, it's synchronous through the Gateway. If it's a downstream side-effect another service cares about, it's an event.
 
@@ -88,21 +88,20 @@ sequenceDiagram
 
 Note the Gateway verifies JWTs **locally** using the shared public key / secret — it does not call the Auth service per-request. This keeps the hot path fast and avoids Auth becoming a single point of failure for every request in the system.
 
-
 ---
 
 ## 2. API Gateway Design
 
 ### 2.1 Routing Table
 
-| Path Prefix | Target Service | Auth Required | Notes |
-|---|---|---|---|
-| `/api/auth/*` | Auth Service | No (public routes: signup/login/refresh) | Rate limited harder |
-| `/api/users/*` | User Service | Yes | |
-| `/api/chat/*` | Chat Service | Yes | REST for history, WS for live |
-| `/socket.io/*` | Chat Service | Yes (JWT in handshake) | Sticky sessions required |
-| `/api/notifications/*` | Notification Service | Yes | |
-| `/health`, `/ready` | Gateway itself | No | K8s probes |
+| Path Prefix            | Target Service       | Auth Required                            | Notes                         |
+| ---------------------- | -------------------- | ---------------------------------------- | ----------------------------- |
+| `/api/auth/*`          | Auth Service         | No (public routes: signup/login/refresh) | Rate limited harder           |
+| `/api/users/*`         | User Service         | Yes                                      |                               |
+| `/api/chat/*`          | Chat Service         | Yes                                      | REST for history, WS for live |
+| `/socket.io/*`         | Chat Service         | Yes (JWT in handshake)                   | Sticky sessions required      |
+| `/api/notifications/*` | Notification Service | Yes                                      |                               |
+| `/health`, `/ready`    | Gateway itself       | No                                       | K8s probes                    |
 
 ### 2.2 JWT Verification Flow
 
@@ -132,7 +131,7 @@ Access tokens are signed **RS256** so the Gateway only needs the Auth service's 
 
 ```ts
 // gateway/src/middleware/rateLimit.ts
-import { redis } from "../lib/redis";
+import { redis } from '../lib/redis';
 
 export function rateLimit(bucket: string, limit: number, windowSec: number) {
   return async (req, res, next) => {
@@ -140,8 +139,8 @@ export function rateLimit(bucket: string, limit: number, windowSec: number) {
     const count = await redis.incr(key);
     if (count === 1) await redis.expire(key, windowSec);
     if (count > limit) {
-      res.setHeader("Retry-After", windowSec.toString());
-      return res.status(429).json({ error: "rate_limited" });
+      res.setHeader('Retry-After', windowSec.toString());
+      return res.status(429).json({ error: 'rate_limited' });
     }
     next();
   };
@@ -154,58 +153,74 @@ Every request gets a `X-Request-Id` (UUID v4) at the Gateway if the client didn'
 
 ### 2.5 Headers Injected by Gateway
 
-| Header | Purpose |
-|---|---|
-| `X-User-Id` | Authenticated user's ID, trusted by downstream services (they never re-verify JWT) |
-| `X-Request-Id` | Correlation ID for tracing |
+| Header              | Purpose                                                                                                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `X-User-Id`         | Authenticated user's ID, trusted by downstream services (they never re-verify JWT)                                                                               |
+| `X-Request-Id`      | Correlation ID for tracing                                                                                                                                       |
 | `X-Internal-Secret` | Shared secret proving the request came through the Gateway, not directly from the internet — downstream services reject requests missing/mismatching this header |
 
 ### 2.6 Error Handling
 
-| Status | Meaning | Gateway behavior |
-|---|---|---|
-| 401 | Missing/invalid/expired JWT | Returned directly by Gateway, never forwarded |
-| 403 | Valid JWT, insufficient permission | Forwarded from service, or Gateway if role check fails at edge |
-| 429 | Rate limit exceeded | Returned directly by Gateway with `Retry-After` |
-| 503 | Downstream service unreachable | Circuit breaker trips after N consecutive failures; Gateway returns 503 immediately instead of hanging |
+| Status | Meaning                            | Gateway behavior                                                                                       |
+| ------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 401    | Missing/invalid/expired JWT        | Returned directly by Gateway, never forwarded                                                          |
+| 403    | Valid JWT, insufficient permission | Forwarded from service, or Gateway if role check fails at edge                                         |
+| 429    | Rate limit exceeded                | Returned directly by Gateway with `Retry-After`                                                        |
+| 503    | Downstream service unreachable     | Circuit breaker trips after N consecutive failures; Gateway returns 503 immediately instead of hanging |
 
 ### 2.7 CORS Configuration
 
 ```ts
-app.use(cors({
-  origin: (origin, cb) => {
-    const allowed = process.env.ALLOWED_ORIGINS!.split(",");
-    cb(null, allowed.includes(origin ?? ""));
-  },
-  credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
-}));
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      const allowed = process.env.ALLOWED_ORIGINS!.split(',');
+      cb(null, allowed.includes(origin ?? ''));
+    },
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+  }),
+);
 ```
 
 ### 2.8 Example Gateway (Express + http-proxy-middleware)
 
 ```ts
 // gateway/src/index.ts
-import express from "express";
-import { createProxyMiddleware } from "http-proxy-middleware";
-import { verifyJwt } from "./middleware/auth";
-import { rateLimit } from "./middleware/rateLimit";
-import { requestId } from "./middleware/requestId";
+import express from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
+import { verifyJwt } from './middleware/auth';
+import { rateLimit } from './middleware/rateLimit';
+import { requestId } from './middleware/requestId';
 
 const app = express();
 app.use(requestId);
 
-app.use("/api/auth", rateLimit("auth", 10, 60),
-  createProxyMiddleware({ target: process.env.AUTH_URL, changeOrigin: true }));
+app.use(
+  '/api/auth',
+  rateLimit('auth', 10, 60),
+  createProxyMiddleware({ target: process.env.AUTH_URL, changeOrigin: true }),
+);
 
-app.use("/api/users", verifyJwt, rateLimit("users", 100, 60),
-  createProxyMiddleware({ target: process.env.USER_URL, changeOrigin: true }));
+app.use(
+  '/api/users',
+  verifyJwt,
+  rateLimit('users', 100, 60),
+  createProxyMiddleware({ target: process.env.USER_URL, changeOrigin: true }),
+);
 
-app.use("/api/chat", verifyJwt, rateLimit("chat", 200, 60),
-  createProxyMiddleware({ target: process.env.CHAT_URL, changeOrigin: true, ws: true }));
+app.use(
+  '/api/chat',
+  verifyJwt,
+  rateLimit('chat', 200, 60),
+  createProxyMiddleware({ target: process.env.CHAT_URL, changeOrigin: true, ws: true }),
+);
 
-app.use("/api/notifications", verifyJwt,
-  createProxyMiddleware({ target: process.env.NOTIF_URL, changeOrigin: true }));
+app.use(
+  '/api/notifications',
+  verifyJwt,
+  createProxyMiddleware({ target: process.env.NOTIF_URL, changeOrigin: true }),
+);
 
 app.listen(process.env.PORT ?? 3000);
 ```
@@ -216,61 +231,69 @@ app.listen(process.env.PORT ?? 3000);
 
 ### 3.1 Endpoints
 
-| Method | Path | Purpose | Auth |
-|---|---|---|---|
-| POST | `/signup` | Create account | No |
-| POST | `/login` | Email+password login | No |
-| POST | `/refresh` | Rotate refresh token → new access token | Refresh cookie |
-| POST | `/logout` | Revoke current session | Yes |
-| POST | `/logout-all` | Revoke all sessions/devices | Yes |
-| GET | `/sessions` | List active sessions | Yes |
-| POST | `/verify-email` | Confirm email via token | No |
-| POST | `/forgot-password` | Trigger reset email | No |
-| POST | `/reset-password` | Set new password via token | No |
-| GET | `/oauth/google` | Start Google OAuth | No |
-| GET | `/oauth/google/callback` | Complete OAuth, issue tokens | No |
+| Method | Path                     | Purpose                                 | Auth           |
+| ------ | ------------------------ | --------------------------------------- | -------------- |
+| POST   | `/signup`                | Create account                          | No             |
+| POST   | `/login`                 | Email+password login                    | No             |
+| POST   | `/refresh`               | Rotate refresh token → new access token | Refresh cookie |
+| POST   | `/logout`                | Revoke current session                  | Yes            |
+| POST   | `/logout-all`            | Revoke all sessions/devices             | Yes            |
+| GET    | `/sessions`              | List active sessions                    | Yes            |
+| POST   | `/verify-email`          | Confirm email via token                 | No             |
+| POST   | `/forgot-password`       | Trigger reset email                     | No             |
+| POST   | `/reset-password`        | Set new password via token              | No             |
+| GET    | `/oauth/google`          | Start Google OAuth                      | No             |
+| GET    | `/oauth/google/callback` | Complete OAuth, issue tokens            | No             |
 
 ### 3.2 Database Schema (MySQL + Drizzle)
 
 ```ts
 // auth-service/src/db/schema.ts
-import { mysqlTable, varchar, boolean, timestamp, int, index } from "drizzle-orm/mysql-core";
+import { mysqlTable, varchar, boolean, timestamp, int, index } from 'drizzle-orm/mysql-core';
 
-export const users = mysqlTable("users", {
-  id: varchar("id", { length: 36 }).primaryKey(),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  passwordHash: varchar("password_hash", { length: 255 }),
-  emailVerified: boolean("email_verified").default(false),
-  oauthProvider: varchar("oauth_provider", { length: 32 }),
-  oauthId: varchar("oauth_id", { length: 128 }),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
-}, (t) => ({ emailIdx: index("email_idx").on(t.email) }));
+export const users = mysqlTable(
+  'users',
+  {
+    id: varchar('id', { length: 36 }).primaryKey(),
+    email: varchar('email', { length: 255 }).notNull().unique(),
+    passwordHash: varchar('password_hash', { length: 255 }),
+    emailVerified: boolean('email_verified').default(false),
+    oauthProvider: varchar('oauth_provider', { length: 32 }),
+    oauthId: varchar('oauth_id', { length: 128 }),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+  },
+  (t) => ({ emailIdx: index('email_idx').on(t.email) }),
+);
 
-export const refreshTokens = mysqlTable("refresh_tokens", {
-  id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
-  tokenHash: varchar("token_hash", { length: 255 }).notNull(),
-  deviceInfo: varchar("device_info", { length: 255 }),
-  ipAddress: varchar("ip_address", { length: 45 }),
-  revoked: boolean("revoked").default(false),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (t) => ({ userIdx: index("user_idx").on(t.userId) }));
+export const refreshTokens = mysqlTable(
+  'refresh_tokens',
+  {
+    id: varchar('id', { length: 36 }).primaryKey(),
+    userId: varchar('user_id', { length: 36 }).notNull(),
+    tokenHash: varchar('token_hash', { length: 255 }).notNull(),
+    deviceInfo: varchar('device_info', { length: 255 }),
+    ipAddress: varchar('ip_address', { length: 45 }),
+    revoked: boolean('revoked').default(false),
+    expiresAt: timestamp('expires_at').notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (t) => ({ userIdx: index('user_idx').on(t.userId) }),
+);
 
-export const passwordResets = mysqlTable("password_resets", {
-  id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
-  tokenHash: varchar("token_hash", { length: 255 }).notNull(),
-  used: boolean("used").default(false),
-  expiresAt: timestamp("expires_at").notNull(),
+export const passwordResets = mysqlTable('password_resets', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  userId: varchar('user_id', { length: 36 }).notNull(),
+  tokenHash: varchar('token_hash', { length: 255 }).notNull(),
+  used: boolean('used').default(false),
+  expiresAt: timestamp('expires_at').notNull(),
 });
 
-export const emailVerifications = mysqlTable("email_verifications", {
-  id: varchar("id", { length: 36 }).primaryKey(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
-  tokenHash: varchar("token_hash", { length: 255 }).notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
+export const emailVerifications = mysqlTable('email_verifications', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  userId: varchar('user_id', { length: 36 }).notNull(),
+  tokenHash: varchar('token_hash', { length: 255 }).notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
 });
 ```
 
@@ -327,12 +350,12 @@ sequenceDiagram
 ```ts
 // Access token payload (15 min TTL)
 interface AccessTokenPayload {
-  sub: string;        // userId
+  sub: string; // userId
   email: string;
   roles: string[];
   iat: number;
   exp: number;
-  jti: string;        // token id, for potential blocklist
+  jti: string; // token id, for potential blocklist
 }
 
 // Refresh token: opaque random string, NOT a JWT.
@@ -410,13 +433,13 @@ sequenceDiagram
 
 ### 3.11 Events Emitted (RabbitMQ)
 
-| Event | When |
-|---|---|
-| `user.signed_up` | After successful signup |
-| `auth.email_verified` | After email verification |
-| `auth.password_reset_requested` | After forgot-password |
-| `auth.login_succeeded` | Every successful login (for audit log / anomaly detection) |
-| `auth.login_failed` | Every failed attempt (for security monitoring) |
+| Event                           | When                                                       |
+| ------------------------------- | ---------------------------------------------------------- |
+| `user.signed_up`                | After successful signup                                    |
+| `auth.email_verified`           | After email verification                                   |
+| `auth.password_reset_requested` | After forgot-password                                      |
+| `auth.login_succeeded`          | Every successful login (for audit log / anomaly detection) |
+| `auth.login_failed`             | Every failed attempt (for security monitoring)             |
 
 ### 3.12 Security Considerations
 
@@ -432,17 +455,17 @@ sequenceDiagram
 
 ### 4.1 Endpoints
 
-| Method | Path | Purpose | Auth |
-|---|---|---|---|
-| GET | `/users/me` | Current user's full profile | Yes |
-| GET | `/users/:id` | Public profile | Yes |
-| PATCH | `/users/me` | Update profile fields | Yes |
-| PATCH | `/users/me/preferences` | Update preferences JSON | Yes |
-| GET | `/users/search?q=` | Meilisearch-backed search | Yes |
-| POST | `/users/:id/follow` | Follow a user | Yes |
-| DELETE | `/users/:id/follow` | Unfollow | Yes |
-| GET | `/users/:id/followers` | List followers | Yes |
-| GET | `/users/:id/following` | List following | Yes |
+| Method | Path                    | Purpose                     | Auth |
+| ------ | ----------------------- | --------------------------- | ---- |
+| GET    | `/users/me`             | Current user's full profile | Yes  |
+| GET    | `/users/:id`            | Public profile              | Yes  |
+| PATCH  | `/users/me`             | Update profile fields       | Yes  |
+| PATCH  | `/users/me/preferences` | Update preferences JSON     | Yes  |
+| GET    | `/users/search?q=`      | Meilisearch-backed search   | Yes  |
+| POST   | `/users/:id/follow`     | Follow a user               | Yes  |
+| DELETE | `/users/:id/follow`     | Unfollow                    | Yes  |
+| GET    | `/users/:id/followers`  | List followers              | Yes  |
+| GET    | `/users/:id/following`  | List following              | Yes  |
 
 ### 4.2 Database Schema (Prisma)
 
@@ -485,12 +508,14 @@ Standard REST CRUD; the one nuance is that `Profile.id` is **not** generated her
 Preferences (theme, notification settings, privacy toggles) are stored as a single `Json` column rather than normalized columns, because the shape changes often and isn't queried relationally. Validation happens at the API layer with a Zod schema before the blob is persisted, so garbage never lands in the DB even though Postgres itself won't enforce shape.
 
 ```ts
-const PreferencesSchema = z.object({
-  theme: z.enum(["light", "dark", "system"]).default("system"),
-  emailNotifications: z.boolean().default(true),
-  pushNotifications: z.boolean().default(true),
-  profileVisibility: z.enum(["public", "followers", "private"]).default("public"),
-}).partial();
+const PreferencesSchema = z
+  .object({
+    theme: z.enum(['light', 'dark', 'system']).default('system'),
+    emailNotifications: z.boolean().default(true),
+    pushNotifications: z.boolean().default(true),
+    profileVisibility: z.enum(['public', 'followers', 'private']).default('public'),
+  })
+  .partial();
 ```
 
 ### 4.5 Search Implementation (Meilisearch)
@@ -499,9 +524,14 @@ Profiles are pushed into a `profiles` Meilisearch index on create/update (via a 
 
 ```ts
 async function indexProfile(p: Profile) {
-  await meili.index("profiles").addDocuments([{
-    id: p.id, username: p.username, displayName: p.displayName, bio: p.bio,
-  }]);
+  await meili.index('profiles').addDocuments([
+    {
+      id: p.id,
+      username: p.username,
+      displayName: p.displayName,
+      bio: p.bio,
+    },
+  ]);
 }
 ```
 
@@ -511,17 +541,17 @@ Enforced via the `@@unique([followerId, followingId])` constraint — a duplicat
 
 ### 4.7 Events Consumed
 
-| Event | From | Action |
-|---|---|---|
-| `user.signed_up` | Auth | Create `Profile` row, index in Meilisearch |
+| Event                 | From | Action                                             |
+| --------------------- | ---- | -------------------------------------------------- |
+| `user.signed_up`      | Auth | Create `Profile` row, index in Meilisearch         |
 | `auth.email_verified` | Auth | Optionally flag profile as verified badge-eligible |
 
 ### 4.8 Events Emitted
 
-| Event | To |
-|---|---|
+| Event                  | To                                                   |
+| ---------------------- | ---------------------------------------------------- |
 | `user.profile_updated` | Chat (to refresh cached display names), Notification |
-| `user.followed` | Notification (so the followed user gets notified) |
+| `user.followed`        | Notification (so the followed user gets notified)    |
 
 ### 4.9 Caching Strategy (Redis)
 
@@ -537,9 +567,9 @@ export async function getProfile(req: Request, res: Response) {
   if (cached) return res.json(JSON.parse(cached));
 
   const profile = await profileService.findById(req.params.id);
-  if (!profile) return res.status(404).json({ error: "not_found" });
+  if (!profile) return res.status(404).json({ error: 'not_found' });
 
-  await redis.set(`profile:${req.params.id}`, JSON.stringify(profile), "EX", 300);
+  await redis.set(`profile:${req.params.id}`, JSON.stringify(profile), 'EX', 300);
   res.json(profile);
 }
 
@@ -552,7 +582,7 @@ export const profileService = {
     const updated = await prisma.profile.update({ where: { id }, data });
     await redis.del(`profile:${id}`);
     await indexProfile(updated);
-    await publish("user.profile_updated", { userId: id });
+    await publish('user.profile_updated', { userId: id });
     return updated;
   },
 };
@@ -575,22 +605,22 @@ export const followRepository = {
 
 ### 5.1 Endpoints
 
-| Method/Event | Path | Purpose |
-|---|---|---|
-| GET | `/rooms/:id/messages?before=` | Paginated message history (REST) |
-| POST | `/rooms` | Create a room |
-| GET | `/rooms/dm/:userId` | Get-or-create a DM room |
-| POST | `/rooms/:id/upload-url` | Get S3 presigned upload URL |
-| WS `connect` | — | Socket.IO handshake with JWT |
-| WS `message:send` | — | Send a message |
-| WS `message:read` | — | Mark read up to a message |
-| WS `typing:start/stop` | — | Typing indicator |
+| Method/Event           | Path                          | Purpose                          |
+| ---------------------- | ----------------------------- | -------------------------------- |
+| GET                    | `/rooms/:id/messages?before=` | Paginated message history (REST) |
+| POST                   | `/rooms`                      | Create a room                    |
+| GET                    | `/rooms/dm/:userId`           | Get-or-create a DM room          |
+| POST                   | `/rooms/:id/upload-url`       | Get S3 presigned upload URL      |
+| WS `connect`           | —                             | Socket.IO handshake with JWT     |
+| WS `message:send`      | —                             | Send a message                   |
+| WS `message:read`      | —                             | Mark read up to a message        |
+| WS `typing:start/stop` | —                             | Typing indicator                 |
 
 ### 5.2 Database Schema (Mongoose)
 
 ```ts
 const RoomSchema = new Schema({
-  type: { type: String, enum: ["dm", "group"], required: true },
+  type: { type: String, enum: ['dm', 'group'], required: true },
   members: [{ type: String, required: true }], // userIds
   name: String, // group rooms only
   lastMessageAt: Date,
@@ -599,7 +629,7 @@ const RoomSchema = new Schema({
 RoomSchema.index({ members: 1 });
 
 const MessageSchema = new Schema({
-  roomId: { type: Schema.Types.ObjectId, ref: "Room", required: true },
+  roomId: { type: Schema.Types.ObjectId, ref: 'Room', required: true },
   senderId: { type: String, required: true },
   content: { type: String, required: true },
   attachments: [{ url: String, type: String, size: Number }],
@@ -663,9 +693,9 @@ DMs reuse the exact same `message:send` path as group messages — a DM is simpl
 
 ```ts
 // key: typing:{roomId}:{userId}, value: "1", TTL 5s
-socket.on("typing:start", async ({ roomId }) => {
-  await redis.set(`typing:${roomId}:${userId}`, "1", "EX", 5);
-  socket.to(roomId).emit("typing:update", { userId, typing: true });
+socket.on('typing:start', async ({ roomId }) => {
+  await redis.set(`typing:${roomId}:${userId}`, '1', 'EX', 5);
+  socket.to(roomId).emit('typing:update', { userId, typing: true });
 });
 // No explicit stop event needed for correctness — TTL expiry self-heals
 // if the client disconnects mid-type; typing:stop just clears it early.
@@ -676,7 +706,7 @@ socket.on("typing:start", async ({ roomId }) => {
 Chat Service runs multiple pods behind the Gateway. Socket.IO's Redis adapter is used so `io.to(room).emit(...)` fans out across **all** pods, not just the one holding the sender's socket:
 
 ```ts
-import { createAdapter } from "@socket.io/redis-adapter";
+import { createAdapter } from '@socket.io/redis-adapter';
 const pubClient = redis.duplicate();
 const subClient = redis.duplicate();
 io.adapter(createAdapter(pubClient, subClient));
@@ -699,10 +729,10 @@ Files never pass through the Chat Service's own bandwidth — client uploads dir
 
 ### 5.11 Events Consumed / Emitted
 
-| Direction | Event | Purpose |
-|---|---|---|
-| Consumes | `user.profile_updated` | Refresh cached sender display name/avatar on next message render |
-| Emits | `chat.message_sent` | Notification service (push/email for offline recipients) |
+| Direction | Event                  | Purpose                                                          |
+| --------- | ---------------------- | ---------------------------------------------------------------- |
+| Consumes  | `user.profile_updated` | Refresh cached sender display name/avatar on next message render |
+| Emits     | `chat.message_sent`    | Notification service (push/email for offline recipients)         |
 
 ### 5.12 Sample Code
 
@@ -711,16 +741,20 @@ Files never pass through the Chat Service's own bandwidth — client uploads dir
 export function registerHandlers(io: Server, socket: Socket) {
   const userId = socket.data.userId;
 
-  socket.on("message:send", async ({ roomId, content, attachments }, ack) => {
+  socket.on('message:send', async ({ roomId, content, attachments }, ack) => {
     const room = await Room.findById(roomId);
-    if (!room?.members.includes(userId)) return ack({ error: "forbidden" });
+    if (!room?.members.includes(userId)) return ack({ error: 'forbidden' });
 
     const message = await Message.create({ roomId, senderId: userId, content, attachments });
     await Room.updateOne({ _id: roomId }, { lastMessageAt: new Date() });
 
-    io.to(roomId).emit("message:new", message);
-    await publish("chat.message_sent", { roomId, messageId: message.id, senderId: userId,
-      recipients: room.members.filter((m: string) => m !== userId) });
+    io.to(roomId).emit('message:new', message);
+    await publish('chat.message_sent', {
+      roomId,
+      messageId: message.id,
+      senderId: userId,
+      recipients: room.members.filter((m: string) => m !== userId),
+    });
 
     ack({ messageId: message.id });
   });
@@ -740,60 +774,64 @@ export async function getHistory(roomId: string, before?: string, limit = 30) {
 
 ### 6.1 Endpoints
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/notifications` | Paginated in-app notifications |
-| PATCH | `/notifications/:id/read` | Mark one as read |
-| PATCH | `/notifications/read-all` | Mark all as read |
-| GET | `/notifications/unread-count` | Badge count |
-| PUT | `/notifications/preferences` | Per-channel opt in/out |
+| Method | Path                          | Purpose                        |
+| ------ | ----------------------------- | ------------------------------ |
+| GET    | `/notifications`              | Paginated in-app notifications |
+| PATCH  | `/notifications/:id/read`     | Mark one as read               |
+| PATCH  | `/notifications/read-all`     | Mark all as read               |
+| GET    | `/notifications/unread-count` | Badge count                    |
+| PUT    | `/notifications/preferences`  | Per-channel opt in/out         |
 
 ### 6.2 Database Schema (PostgreSQL + Drizzle)
 
 ```ts
-export const notifications = pgTable("notifications", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
-  type: varchar("type", { length: 64 }).notNull(), // e.g. "chat.message", "user.followed"
-  title: varchar("title", { length: 255 }).notNull(),
-  body: text("body"),
-  data: jsonb("data").default({}),
-  read: boolean("read").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (t) => ({ userIdx: index("user_idx").on(t.userId, t.read) }));
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: varchar('user_id', { length: 36 }).notNull(),
+    type: varchar('type', { length: 64 }).notNull(), // e.g. "chat.message", "user.followed"
+    title: varchar('title', { length: 255 }).notNull(),
+    body: text('body'),
+    data: jsonb('data').default({}),
+    read: boolean('read').default(false),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (t) => ({ userIdx: index('user_idx').on(t.userId, t.read) }),
+);
 
-export const notificationPreferences = pgTable("notification_preferences", {
-  userId: varchar("user_id", { length: 36 }).primaryKey(),
-  emailEnabled: boolean("email_enabled").default(true),
-  pushEnabled: boolean("push_enabled").default(true),
-  mutedTypes: jsonb("muted_types").default([]),
+export const notificationPreferences = pgTable('notification_preferences', {
+  userId: varchar('user_id', { length: 36 }).primaryKey(),
+  emailEnabled: boolean('email_enabled').default(true),
+  pushEnabled: boolean('push_enabled').default(true),
+  mutedTypes: jsonb('muted_types').default([]),
 });
 
-export const pushTokens = pgTable("push_tokens", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: varchar("user_id", { length: 36 }).notNull(),
-  fcmToken: varchar("fcm_token", { length: 255 }).notNull(),
-  platform: varchar("platform", { length: 16 }),
+export const pushTokens = pgTable('push_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id', { length: 36 }).notNull(),
+  fcmToken: varchar('fcm_token', { length: 255 }).notNull(),
+  platform: varchar('platform', { length: 16 }),
 });
 ```
 
 ### 6.3 Notification Types
 
-| Type | Channels | Trigger event |
-|---|---|---|
-| `auth.verify_email` | Email only | `user.signed_up` |
-| `auth.password_reset` | Email only | `auth.password_reset_requested` |
-| `chat.message` | Push + in-app (email if offline > 5 min) | `chat.message_sent` |
-| `user.followed` | In-app + push | `user.followed` |
+| Type                  | Channels                                 | Trigger event                   |
+| --------------------- | ---------------------------------------- | ------------------------------- |
+| `auth.verify_email`   | Email only                               | `user.signed_up`                |
+| `auth.password_reset` | Email only                               | `auth.password_reset_requested` |
+| `chat.message`        | Push + in-app (email if offline > 5 min) | `chat.message_sent`             |
+| `user.followed`       | In-app + push                            | `user.followed`                 |
 
 ### 6.4 Event Consumption from RabbitMQ
 
-| Event consumed | Handler |
-|---|---|
-| `user.signed_up` | Send verification email |
-| `auth.password_reset_requested` | Send reset email |
-| `chat.message_sent` | Fan out to each offline/backgrounded recipient: push + in-app row; email only if unread after 5 min (delayed check) |
-| `user.followed` | In-app + push to the followed user |
+| Event consumed                  | Handler                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `user.signed_up`                | Send verification email                                                                                             |
+| `auth.password_reset_requested` | Send reset email                                                                                                    |
+| `chat.message_sent`             | Fan out to each offline/backgrounded recipient: push + in-app row; email only if unread after 5 min (delayed check) |
+| `user.followed`                 | In-app + push to the followed user                                                                                  |
 
 ### 6.5 Email Sending Flow (Resend/SES + templates)
 
@@ -817,7 +855,7 @@ async function sendPush(userId: string, title: string, body: string, data: objec
   const tokens = await db.query.pushTokens.findMany({ where: eq(pushTokens.userId, userId) });
   if (!tokens.length) return;
   await fcm.sendEachForMulticast({
-    tokens: tokens.map(t => t.fcmToken),
+    tokens: tokens.map((t) => t.fcmToken),
     notification: { title, body },
     data,
   });
@@ -851,15 +889,17 @@ export async function handleChatMessageSent(event: ChatMessageSentEvent) {
 
     const prefs = await getPreferences(userId);
     const dedupeKey = `dedupe:chat.message:${event.roomId}:${userId}`;
-    const isNew = await redis.set(dedupeKey, "1", "NX", "EX", 60);
+    const isNew = await redis.set(dedupeKey, '1', 'NX', 'EX', 60);
 
     await db.insert(notifications).values({
-      userId, type: "chat.message", title: "New message",
+      userId,
+      type: 'chat.message',
+      title: 'New message',
       data: { roomId: event.roomId, messageId: event.messageId },
     });
 
     if (isNew && prefs.pushEnabled) {
-      await sendPush(userId, "New message", "You have a new message", { roomId: event.roomId });
+      await sendPush(userId, 'New message', 'You have a new message', { roomId: event.roomId });
     }
   }
 }
@@ -887,27 +927,44 @@ One **topic exchange** (`nexus.events`), routing keys of the form `<service>.<ev
 
 ### 7.2 Event Catalog
 
-| Event Name | Publisher | Consumers | Payload |
-|---|---|---|---|
-| `user.signed_up` | Auth | User, Notification | `{userId, email}` |
-| `auth.email_verified` | Auth | User | `{userId}` |
-| `auth.password_reset_requested` | Auth | Notification | `{userId, email, resetToken}` |
-| `auth.login_succeeded` | Auth | Audit | `{userId, ip, ts}` |
-| `auth.login_failed` | Auth | Audit | `{email, ip, ts}` |
-| `user.profile_updated` | User | Chat, Notification | `{userId}` |
-| `user.followed` | User | Notification | `{followerId, followingId}` |
-| `chat.message_sent` | Chat | Notification | `{roomId, messageId, senderId, recipients[]}` |
+| Event Name                      | Publisher | Consumers          | Payload                                       |
+| ------------------------------- | --------- | ------------------ | --------------------------------------------- |
+| `user.signed_up`                | Auth      | User, Notification | `{userId, email}`                             |
+| `auth.email_verified`           | Auth      | User               | `{userId}`                                    |
+| `auth.password_reset_requested` | Auth      | Notification       | `{userId, email, resetToken}`                 |
+| `auth.login_succeeded`          | Auth      | Audit              | `{userId, ip, ts}`                            |
+| `auth.login_failed`             | Auth      | Audit              | `{email, ip, ts}`                             |
+| `user.profile_updated`          | User      | Chat, Notification | `{userId}`                                    |
+| `user.followed`                 | User      | Notification       | `{followerId, followingId}`                   |
+| `chat.message_sent`             | Chat      | Notification       | `{roomId, messageId, senderId, recipients[]}` |
 
 ### 7.3 Event Payload Schemas (TypeScript)
 
 ```ts
-interface UserSignedUpEvent { userId: string; email: string; }
-interface AuthEmailVerifiedEvent { userId: string; }
-interface PasswordResetRequestedEvent { userId: string; email: string; resetToken: string; }
-interface UserProfileUpdatedEvent { userId: string; }
-interface UserFollowedEvent { followerId: string; followingId: string; }
+interface UserSignedUpEvent {
+  userId: string;
+  email: string;
+}
+interface AuthEmailVerifiedEvent {
+  userId: string;
+}
+interface PasswordResetRequestedEvent {
+  userId: string;
+  email: string;
+  resetToken: string;
+}
+interface UserProfileUpdatedEvent {
+  userId: string;
+}
+interface UserFollowedEvent {
+  followerId: string;
+  followingId: string;
+}
 interface ChatMessageSentEvent {
-  roomId: string; messageId: string; senderId: string; recipients: string[];
+  roomId: string;
+  messageId: string;
+  senderId: string;
+  recipients: string[];
 }
 ```
 
@@ -916,12 +973,12 @@ interface ChatMessageSentEvent {
 Every queue is declared with:
 
 ```ts
-await channel.assertQueue("notification-service.queue", {
+await channel.assertQueue('notification-service.queue', {
   durable: true,
   arguments: {
-    "x-dead-letter-exchange": "nexus.dlx",
-    "x-dead-letter-routing-key": "notification-service.dlq",
-    "x-message-ttl": 60000, // for the retry-delay queue variant
+    'x-dead-letter-exchange': 'nexus.dlx',
+    'x-dead-letter-routing-key': 'notification-service.dlq',
+    'x-message-ttl': 60000, // for the retry-delay queue variant
   },
 });
 ```
@@ -935,7 +992,7 @@ Every consumer is written assuming **at-least-once delivery** (RabbitMQ can rede
 ```ts
 async function handleWithIdempotency(msg: ConsumeMessage, handler: () => Promise<void>) {
   const eventId = msg.properties.messageId;
-  const already = await redis.set(`processed:${eventId}`, "1", "NX", "EX", 86400);
+  const already = await redis.set(`processed:${eventId}`, '1', 'NX', 'EX', 86400);
   if (!already) return channel.ack(msg); // seen before, skip silently
   await handler();
   channel.ack(msg);
@@ -951,29 +1008,33 @@ If User service fails to create the profile row after `user.signed_up` (e.g. Mei
 ```ts
 // shared/src/messaging/publisher.ts
 export async function publish(routingKey: string, payload: object) {
-  await channel.publish("nexus.events", routingKey, Buffer.from(JSON.stringify(payload)), {
+  await channel.publish('nexus.events', routingKey, Buffer.from(JSON.stringify(payload)), {
     persistent: true,
     messageId: randomUUID(),
     timestamp: Date.now(),
-    contentType: "application/json",
+    contentType: 'application/json',
   });
 }
 
 // notification-service/src/messaging/consumer.ts
-await channel.assertExchange("nexus.events", "topic", { durable: true });
-await channel.assertQueue("notification-service.queue", { durable: true, arguments: dlqArgs });
-await channel.bindQueue("notification-service.queue", "nexus.events", "chat.*");
-await channel.bindQueue("notification-service.queue", "nexus.events", "user.*");
-await channel.bindQueue("notification-service.queue", "nexus.events", "auth.password_reset_requested");
+await channel.assertExchange('nexus.events', 'topic', { durable: true });
+await channel.assertQueue('notification-service.queue', { durable: true, arguments: dlqArgs });
+await channel.bindQueue('notification-service.queue', 'nexus.events', 'chat.*');
+await channel.bindQueue('notification-service.queue', 'nexus.events', 'user.*');
+await channel.bindQueue(
+  'notification-service.queue',
+  'nexus.events',
+  'auth.password_reset_requested',
+);
 
-channel.consume("notification-service.queue", async (msg) => {
+channel.consume('notification-service.queue', async (msg) => {
   if (!msg) return;
   const event = JSON.parse(msg.content.toString());
   try {
     await routeEvent(msg.fields.routingKey, event);
     channel.ack(msg);
   } catch (err) {
-    logger.error({ err, routingKey: msg.fields.routingKey }, "event handling failed");
+    logger.error({ err, routingKey: msg.fields.routingKey }, 'event handling failed');
     channel.nack(msg, false, false); // sends to DLX per queue args
   }
 });
@@ -985,12 +1046,12 @@ channel.consume("notification-service.queue", async (msg) => {
 
 ### 8.1 Why Each Service Owns Its Own Database
 
-| Service | DB | Why this fits |
-|---|---|---|
-| Auth | MySQL + Drizzle | Simple relational rows (users, tokens), strong consistency for credentials, Drizzle's lightweight SQL-first API keeps auth-critical queries explicit |
-| User | PostgreSQL + Prisma | Relational (follows graph) + JSONB for flexible preferences; Prisma's DX suits a service with many evolving fields |
-| Chat | MongoDB + Mongoose | Messages are naturally document-shaped, high write volume, flexible schema for attachments |
-| Notification | PostgreSQL + Drizzle | Relational, mostly append-only + status flips; Drizzle keeps queue-worker code lightweight |
+| Service      | DB                   | Why this fits                                                                                                                                        |
+| ------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth         | MySQL + Drizzle      | Simple relational rows (users, tokens), strong consistency for credentials, Drizzle's lightweight SQL-first API keeps auth-critical queries explicit |
+| User         | PostgreSQL + Prisma  | Relational (follows graph) + JSONB for flexible preferences; Prisma's DX suits a service with many evolving fields                                   |
+| Chat         | MongoDB + Mongoose   | Messages are naturally document-shaped, high write volume, flexible schema for attachments                                                           |
+| Notification | PostgreSQL + Drizzle | Relational, mostly append-only + status flips; Drizzle keeps queue-worker code lightweight                                                           |
 
 **Database-per-service** is deliberate: it forces every cross-service interaction through an explicit API or event, which is what makes independent deployment and scaling possible. The cost is no cross-service joins or transactions — addressed below.
 
@@ -1014,11 +1075,11 @@ Two-phase commit would require all four databases to participate in a distribute
 
 ### 8.6 Backup + Restore Strategy
 
-| DB | Method | Frequency | Retention |
-|---|---|---|---|
-| MySQL (Auth) | `mysqldump` to S3, plus binlog shipping for PITR | Nightly full + continuous binlog | 30 days |
-| PostgreSQL (User, Notification) | `pg_dump` + WAL archiving | Nightly full + continuous WAL | 30 days |
-| MongoDB (Chat) | `mongodump` to S3 | Nightly | 14 days (chat history is high-volume, lower criticality) |
+| DB                              | Method                                           | Frequency                        | Retention                                                |
+| ------------------------------- | ------------------------------------------------ | -------------------------------- | -------------------------------------------------------- |
+| MySQL (Auth)                    | `mysqldump` to S3, plus binlog shipping for PITR | Nightly full + continuous binlog | 30 days                                                  |
+| PostgreSQL (User, Notification) | `pg_dump` + WAL archiving                        | Nightly full + continuous WAL    | 30 days                                                  |
+| MongoDB (Chat)                  | `mongodump` to S3                                | Nightly                          | 14 days (chat history is high-volume, lower criticality) |
 
 Restore drills are run quarterly against a staging cluster to verify backups are actually usable, not just present.
 
@@ -1028,13 +1089,13 @@ Restore drills are run quarterly against a staging cluster to verify backups are
 
 ### 9.1 What to Cache (per service)
 
-| Service | Cached data |
-|---|---|
-| Gateway | Rate-limit counters, JWT public-key cache |
-| Auth | Login failure counters, email-verification/reset rate limits |
-| User | Profile JSON, follower/following counts |
-| Chat | Online users set, typing indicators, Socket.IO adapter pub/sub |
-| Notification | Dedup keys |
+| Service      | Cached data                                                    |
+| ------------ | -------------------------------------------------------------- |
+| Gateway      | Rate-limit counters, JWT public-key cache                      |
+| Auth         | Login failure counters, email-verification/reset rate limits   |
+| User         | Profile JSON, follower/following counts                        |
+| Chat         | Online users set, typing indicators, Socket.IO adapter pub/sub |
+| Notification | Dedup keys                                                     |
 
 ### 9.2 Cache Key Naming Convention
 
@@ -1042,13 +1103,13 @@ Restore drills are run quarterly against a staging cluster to verify backups are
 
 ### 9.3 TTL Values
 
-| Key pattern | TTL |
-|---|---|
-| `gw:rl:*` (rate limit counters) | window length (60s typical) |
-| `user:profile:*` | 5 min |
-| `chat:typing:*` | 5 sec |
-| `dedupe:*` | 60 sec |
-| `auth:login_fail:*` | 15 min |
+| Key pattern                             | TTL                                 |
+| --------------------------------------- | ----------------------------------- |
+| `gw:rl:*` (rate limit counters)         | window length (60s typical)         |
+| `user:profile:*`                        | 5 min                               |
+| `chat:typing:*`                         | 5 sec                               |
+| `dedupe:*`                              | 60 sec                              |
+| `auth:login_fail:*`                     | 15 min                              |
 | session-adjacent Socket.IO adapter keys | connection lifetime (no manual TTL) |
 
 ### 9.4 Cache Invalidation Strategy
@@ -1065,7 +1126,7 @@ Covered in §2.3 — `INCR`/`EXPIRE` pattern, one key per bucket per identity (I
 
 ### 9.7 Online Users (Chat)
 
-`SADD chat:online_users {userId}` on connect, `SREM` on disconnect. Used by Notification service (§6.11) to decide whether to push or let the live socket handle delivery. Because Chat runs multiple pods, this set is the single shared source of truth for "is this user connected to *any* pod right now."
+`SADD chat:online_users {userId}` on connect, `SREM` on disconnect. Used by Notification service (§6.11) to decide whether to push or let the live socket handle delivery. Because Chat runs multiple pods, this set is the single shared source of truth for "is this user connected to _any_ pod right now."
 
 ### 9.8 Pub/Sub for Real-Time
 
@@ -1096,12 +1157,14 @@ Explicit origin allowlist from environment config (§2.7) — never `origin: "*"
 Applied at the Gateway (and defense-in-depth at each service):
 
 ```ts
-app.use(helmet({
-  contentSecurityPolicy: { directives: { defaultSrc: ["'self'"] } },
-  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
-  frameguard: { action: "deny" },
-  noSniff: true,
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: { directives: { defaultSrc: ["'self'"] } },
+    hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+    frameguard: { action: 'deny' },
+    noSniff: true,
+  }),
+);
 ```
 
 ### 10.6 SQL Injection Prevention
@@ -1129,7 +1192,10 @@ Every REST handler and every Socket.IO event handler validates its input against
 const SendMessageSchema = z.object({
   roomId: z.string().uuid(),
   content: z.string().min(1).max(4000),
-  attachments: z.array(z.object({ url: z.string().url(), type: z.string(), size: z.number() })).max(5).optional(),
+  attachments: z
+    .array(z.object({ url: z.string().url(), type: z.string(), size: z.number() }))
+    .max(5)
+    .optional(),
 });
 ```
 
@@ -1147,14 +1213,14 @@ Every service logs JSON via Pino, with `requestId`, `userId` (when known), and `
 
 ### 11.2 Metrics (Prometheus)
 
-| Metric | Type | Why |
-|---|---|---|
-| `http_request_duration_seconds` | Histogram, per route+method+status | Latency/SLO tracking |
-| `http_requests_total` | Counter, per route+status | Error-rate alerting |
-| `rabbitmq_queue_depth` | Gauge, per queue | Detect consumer falling behind |
-| `websocket_connections_active` | Gauge | Chat service capacity planning |
-| `db_query_duration_seconds` | Histogram, per operation | Find slow queries before they page someone |
-| `cache_hit_ratio` | Gauge, per key prefix | Validate caching is actually helping |
+| Metric                          | Type                               | Why                                        |
+| ------------------------------- | ---------------------------------- | ------------------------------------------ |
+| `http_request_duration_seconds` | Histogram, per route+method+status | Latency/SLO tracking                       |
+| `http_requests_total`           | Counter, per route+status          | Error-rate alerting                        |
+| `rabbitmq_queue_depth`          | Gauge, per queue                   | Detect consumer falling behind             |
+| `websocket_connections_active`  | Gauge                              | Chat service capacity planning             |
+| `db_query_duration_seconds`     | Histogram, per operation           | Find slow queries before they page someone |
+| `cache_hit_ratio`               | Gauge, per key prefix              | Validate caching is actually helping       |
 
 ### 11.3 Distributed Tracing (OpenTelemetry + Jaeger)
 
@@ -1170,13 +1236,13 @@ Unhandled exceptions and explicitly captured errors (e.g. failed payment-adjacen
 
 ### 11.6 Alerting Rules (Grafana)
 
-| Alert | Condition |
-|---|---|
-| High error rate | `http_requests_total{status=~"5.."}` rate > 2% over 5 min |
-| Queue backing up | `rabbitmq_queue_depth` > 1000 for 10 min |
-| DLQ growth | any message lands in a `.dlq` queue → immediate page |
-| p99 latency | request duration p99 > 1s for any critical route, 5 min sustained |
-| Pod not ready | `/ready` failing for > 2 min |
+| Alert            | Condition                                                         |
+| ---------------- | ----------------------------------------------------------------- |
+| High error rate  | `http_requests_total{status=~"5.."}` rate > 2% over 5 min         |
+| Queue backing up | `rabbitmq_queue_depth` > 1000 for 10 min                          |
+| DLQ growth       | any message lands in a `.dlq` queue → immediate page              |
+| p99 latency      | request duration p99 > 1s for any critical route, 5 min sustained |
+| Pod not ready    | `/ready` failing for > 2 min                                      |
 
 ---
 
@@ -1186,80 +1252,80 @@ Unhandled exceptions and explicitly captured errors (e.g. failed payment-adjacen
 
 ```yaml
 # docker-compose.yml
-version: "3.9"
+version: '3.9'
 services:
   gateway:
     build: ./services/gateway
-    ports: ["3000:3000"]
+    ports: ['3000:3000']
     env_file: ./services/gateway/.env
     depends_on: [auth, user, chat, notification, redis]
 
   auth:
     build: ./services/auth
-    ports: ["3001:3001"]
+    ports: ['3001:3001']
     env_file: ./services/auth/.env
     depends_on: [mysql, rabbitmq]
 
   user:
     build: ./services/user
-    ports: ["3002:3002"]
+    ports: ['3002:3002']
     env_file: ./services/user/.env
     depends_on: [postgres-user, rabbitmq, meilisearch]
 
   chat:
     build: ./services/chat
-    ports: ["3003:3003"]
+    ports: ['3003:3003']
     env_file: ./services/chat/.env
     depends_on: [mongo, redis, rabbitmq, minio]
 
   notification:
     build: ./services/notification
-    ports: ["3004:3004"]
+    ports: ['3004:3004']
     env_file: ./services/notification/.env
     depends_on: [postgres-notif, rabbitmq]
 
   mysql:
     image: mysql:8
     environment: { MYSQL_ROOT_PASSWORD: devpass, MYSQL_DATABASE: nexus_auth }
-    ports: ["3306:3306"]
-    volumes: ["mysql_data:/var/lib/mysql"]
+    ports: ['3306:3306']
+    volumes: ['mysql_data:/var/lib/mysql']
 
   postgres-user:
     image: postgres:16
     environment: { POSTGRES_PASSWORD: devpass, POSTGRES_DB: nexus_user }
-    ports: ["5432:5432"]
-    volumes: ["pguser_data:/var/lib/postgresql/data"]
+    ports: ['5432:5432']
+    volumes: ['pguser_data:/var/lib/postgresql/data']
 
   postgres-notif:
     image: postgres:16
     environment: { POSTGRES_PASSWORD: devpass, POSTGRES_DB: nexus_notif }
-    ports: ["5433:5432"]
-    volumes: ["pgnotif_data:/var/lib/postgresql/data"]
+    ports: ['5433:5432']
+    volumes: ['pgnotif_data:/var/lib/postgresql/data']
 
   mongo:
     image: mongo:7
-    ports: ["27017:27017"]
-    volumes: ["mongo_data:/data/db"]
+    ports: ['27017:27017']
+    volumes: ['mongo_data:/data/db']
 
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports: ['6379:6379']
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    ports: ["5672:5672", "15672:15672"]
+    ports: ['5672:5672', '15672:15672']
 
   meilisearch:
     image: getmeili/meilisearch:v1.9
-    ports: ["7700:7700"]
+    ports: ['7700:7700']
     environment: { MEILI_MASTER_KEY: devkey }
 
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
-    ports: ["9000:9000", "9001:9001"]
+    ports: ['9000:9000', '9001:9001']
     environment: { MINIO_ROOT_USER: minioadmin, MINIO_ROOT_PASSWORD: minioadmin }
-    volumes: ["minio_data:/data"]
+    volumes: ['minio_data:/data']
 
 volumes:
   mysql_data:
@@ -1291,8 +1357,8 @@ spec:
           livenessProbe: { httpGet: { path: /health, port: 3001 }, periodSeconds: 10 }
           readinessProbe: { httpGet: { path: /ready, port: 3001 }, periodSeconds: 5 }
           resources:
-            requests: { cpu: "100m", memory: "128Mi" }
-            limits: { cpu: "500m", memory: "512Mi" }
+            requests: { cpu: '100m', memory: '128Mi' }
+            limits: { cpu: '500m', memory: '512Mi' }
 ---
 apiVersion: v1
 kind: Service
@@ -1322,7 +1388,7 @@ name: deploy-auth-service
 on:
   push:
     branches: [main]
-    paths: ["services/auth/**"]
+    paths: ['services/auth/**']
 
 jobs:
   test:
@@ -1339,7 +1405,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pnpm --filter auth-service exec drizzle-kit migrate
-        env: { DATABASE_URL: "${{ secrets.AUTH_DB_URL }}" }
+        env: { DATABASE_URL: '${{ secrets.AUTH_DB_URL }}' }
 
   build-and-deploy:
     needs: migrate
@@ -1353,13 +1419,13 @@ jobs:
 
 ### 12.4 Environment Variables Per Service
 
-| Service | Key env vars |
-|---|---|
-| Gateway | `AUTH_URL`, `USER_URL`, `CHAT_URL`, `NOTIF_URL`, `JWT_PUBLIC_KEY`, `ALLOWED_ORIGINS`, `REDIS_URL` |
-| Auth | `DATABASE_URL` (MySQL), `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`, `RABBITMQ_URL`, `GOOGLE_CLIENT_ID/SECRET` |
-| User | `DATABASE_URL` (Postgres), `RABBITMQ_URL`, `REDIS_URL`, `MEILISEARCH_URL/KEY` |
-| Chat | `MONGO_URL`, `REDIS_URL`, `RABBITMQ_URL`, `JWT_PUBLIC_KEY`, `S3_ENDPOINT/BUCKET/KEYS` |
-| Notification | `DATABASE_URL` (Postgres), `RABBITMQ_URL`, `REDIS_URL`, `RESEND_API_KEY`, `FCM_CREDENTIALS` |
+| Service      | Key env vars                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------ |
+| Gateway      | `AUTH_URL`, `USER_URL`, `CHAT_URL`, `NOTIF_URL`, `JWT_PUBLIC_KEY`, `ALLOWED_ORIGINS`, `REDIS_URL`      |
+| Auth         | `DATABASE_URL` (MySQL), `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`, `RABBITMQ_URL`, `GOOGLE_CLIENT_ID/SECRET` |
+| User         | `DATABASE_URL` (Postgres), `RABBITMQ_URL`, `REDIS_URL`, `MEILISEARCH_URL/KEY`                          |
+| Chat         | `MONGO_URL`, `REDIS_URL`, `RABBITMQ_URL`, `JWT_PUBLIC_KEY`, `S3_ENDPOINT/BUCKET/KEYS`                  |
+| Notification | `DATABASE_URL` (Postgres), `RABBITMQ_URL`, `REDIS_URL`, `RESEND_API_KEY`, `FCM_CREDENTIALS`            |
 
 ### 12.5 Secrets Management in K8s
 
@@ -1371,7 +1437,7 @@ Default K8s `RollingUpdate` with `maxUnavailable: 0, maxSurge: 1` — a new pod 
 
 ### 12.7 Database Migration in CI/CD
 
-Migrations run as a **separate CI job** (`migrate` in §12.3) gated between tests and deploy — always additive/backward-compatible (new nullable columns, new tables) so the *currently running* old pods keep working unmodified against the new schema during the rollout window. Destructive changes (dropping a column) are split into two deploys: stop using it in code first, drop it in a follow-up release once no running pod references it.
+Migrations run as a **separate CI job** (`migrate` in §12.3) gated between tests and deploy — always additive/backward-compatible (new nullable columns, new tables) so the _currently running_ old pods keep working unmodified against the new schema during the rollout window. Destructive changes (dropping a column) are split into two deploys: stop using it in code first, drop it in a follow-up release once no running pod references it.
 
 ---
 
@@ -1468,8 +1534,8 @@ services/user/
 Pure business logic — password validation, token generation helpers, event payload builders, Zod schema edge cases — tested in isolation with all I/O (DB, Redis, RabbitMQ) mocked. Target: every `services/*/src/services/*.ts` file has a co-located `*.test.ts`.
 
 ```ts
-describe("passwordResetToken", () => {
-  it("generates a token whose hash matches stored hash", () => {
+describe('passwordResetToken', () => {
+  it('generates a token whose hash matches stored hash', () => {
     const { raw, hash } = generateResetToken();
     expect(sha256(raw)).toBe(hash);
   });
@@ -1482,7 +1548,10 @@ Each service's integration suite spins up its real dependencies (MySQL/Postgres/
 
 ```ts
 const mysqlContainer = await new MySqlContainer().start();
-beforeAll(async () => { db = drizzle(mysqlContainer.getConnectionUri()); await migrate(db); });
+beforeAll(async () => {
+  db = drizzle(mysqlContainer.getConnectionUri());
+  await migrate(db);
+});
 ```
 
 ### 14.3 E2E Tests (Supertest)
@@ -1493,12 +1562,13 @@ Full HTTP flows through a running service instance (signup → verify → login 
 
 ```js
 // k6/chat-load.js
-export const options = { vus: 500, duration: "3m" };
+export const options = { vus: 500, duration: '3m' };
 export default function () {
   const res = http.post(`${BASE_URL}/api/chat/rooms/${roomId}/messages`, payload, { headers });
-  check(res, { "status is 200": (r) => r.status === 200 });
+  check(res, { 'status is 200': (r) => r.status === 200 });
 }
 ```
+
 Run against staging before major releases, focused on the Chat service's WebSocket concurrency and the Gateway's rate limiter under real load.
 
 ### 14.5 Contract Testing (Pact)
@@ -1507,12 +1577,12 @@ Gateway (consumer) and each service (provider) maintain a Pact contract for thei
 
 ### 14.6 Coverage Targets
 
-| Layer | Target |
-|---|---|
-| Unit (business logic) | 80%+ |
-| Integration (DB/queue-touching code) | 70%+ |
-| Critical auth flows (signup/login/reset/refresh) | 95%+, no exceptions |
-| Overall per-service | 75%+ enforced in CI, build fails below threshold |
+| Layer                                            | Target                                           |
+| ------------------------------------------------ | ------------------------------------------------ |
+| Unit (business logic)                            | 80%+                                             |
+| Integration (DB/queue-touching code)             | 70%+                                             |
+| Critical auth flows (signup/login/reset/refresh) | 95%+, no exceptions                              |
+| Overall per-service                              | 75%+ enforced in CI, build fails below threshold |
 
 ---
 
@@ -1550,27 +1620,35 @@ Single replica per service, Docker Compose or a small K8s cluster, all databases
 ## 16. Implementation Roadmap
 
 ### Weeks 1–2: Foundation
+
 - Monorepo scaffold (pnpm workspaces, shared packages skeleton), Docker Compose for all infra (MySQL, Postgres x2, Mongo, Redis, RabbitMQ, Meilisearch, MinIO), CI skeleton (lint + test on PR).
 
 ### Weeks 3–4: Auth Service
+
 - Schema + migrations, signup/login/refresh/logout, JWT signing, bcrypt, rate limiting. This unblocks every other service since they all depend on `user.signed_up` and JWT verification.
 
 ### Week 5: Gateway
+
 - JWT verification middleware, proxy routing to Auth (only service that exists so far), rate limiting, request ID propagation. Depends on Auth's JWT format being finalized.
 
 ### Weeks 6–7: User Service
+
 - Schema + migrations, profile CRUD, consume `user.signed_up`, Meilisearch indexing, follow/unfollow. Depends on Auth emitting events correctly.
 
 ### Weeks 8–9: Chat Service
+
 - Schema, Socket.IO + JWT handshake, message send/receive, rooms/DMs, Redis adapter for multi-instance. Depends on Auth (JWT) and User (display names) being stable.
 
 ### Week 10: Notification Service
+
 - Schema, RabbitMQ consumers for all existing events, email sending (verify/reset), push scaffolding. Depends on all other services already emitting their events.
 
 ### Week 11: Cross-Cutting Concerns
+
 - Observability (logging, metrics, tracing) wired into every service, security hardening pass (Helmet, CORS audit, secrets to Vault), full E2E test suite across the whole flow.
 
 ### Week 12: Production Readiness
+
 - Kubernetes manifests, CI/CD pipeline finalized with migration gating, load testing (k6) against staging, runbook/documentation pass, go-live checklist.
 
 ### Dependencies Summary
@@ -1593,11 +1671,11 @@ flowchart LR
 
 ### Milestones
 
-| Milestone | Target week | Definition of done |
-|---|---|---|
-| M1: Auth live | End of week 4 | Signup → login → refresh works end-to-end via Postman |
-| M2: Gateway routing | End of week 5 | Client can reach Auth only through Gateway with rate limiting active |
-| M3: Full REST surface | End of week 7 | Users can sign up, build a profile, search other users |
-| M4: Realtime chat | End of week 9 | Two clients can DM each other with read receipts |
-| M5: Notifications live | End of week 10 | Offline user gets a push for a new message |
-| M6: Production-ready | End of week 12 | Passes load test, full observability, deployed via CI/CD to a real K8s cluster |
+| Milestone              | Target week    | Definition of done                                                             |
+| ---------------------- | -------------- | ------------------------------------------------------------------------------ |
+| M1: Auth live          | End of week 4  | Signup → login → refresh works end-to-end via Postman                          |
+| M2: Gateway routing    | End of week 5  | Client can reach Auth only through Gateway with rate limiting active           |
+| M3: Full REST surface  | End of week 7  | Users can sign up, build a profile, search other users                         |
+| M4: Realtime chat      | End of week 9  | Two clients can DM each other with read receipts                               |
+| M5: Notifications live | End of week 10 | Offline user gets a push for a new message                                     |
+| M6: Production-ready   | End of week 12 | Passes load test, full observability, deployed via CI/CD to a real K8s cluster |

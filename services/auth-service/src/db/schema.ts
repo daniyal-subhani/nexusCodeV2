@@ -51,6 +51,8 @@ export const refreshTokens = mysqlTable(
       .references(() => auth.id, { onDelete: 'cascade' }),
     tokenHash: varchar('token_hash', { length: 64 }).notNull().unique(),
     familyId: varchar('family_id', { length: 36 }).notNull(),
+    used: boolean('used').default(false).notNull(),
+    usedAt: timestamp('used_at', { mode: 'date' }),
     deviceInfo: varchar('device_info', { length: 255 }),
     ipAddress: varchar('ip_address', { length: 45 }),
     revoked: boolean('revoked').default(false).notNull(),
