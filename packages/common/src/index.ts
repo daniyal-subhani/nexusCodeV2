@@ -6,3 +6,4 @@ export * from './middleware/internal-auth';
 export * from './middleware/validate-request';
 export * from './errors/http-error';
 export * from './constants/headers';
+export * from './messaging/rabbitmq/index'

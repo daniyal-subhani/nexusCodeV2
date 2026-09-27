@@ -21,7 +21,9 @@
   "dependencies": {
     "@nexus/common": "workspace:*",
     "@types/nodemailer": "^8.0.1",
+    "amqplib": "^2.0.1",
     "argon2": "^0.45.1",
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
@@ -33,6 +35,8 @@
     "tsup": "^8.5.1"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.8",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.5.0",

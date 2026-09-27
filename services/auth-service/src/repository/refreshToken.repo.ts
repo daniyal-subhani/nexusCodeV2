@@ -34,7 +34,7 @@ export const refreshTokenRepo = {
     await db.delete(refreshTokens).where(eq(refreshTokens.familyId, familyId));
   },
   // cleanup function - bg cron job OR automation cleanup
-  deletedExpired: async () => {
+  deleteExpired: async () => {
     await db.delete(refreshTokens).where(lt(refreshTokens.expiresAt, new Date()));
   },
   markUsed: async (tokenId: string) => {
@@ -46,15 +46,30 @@ export const refreshTokenRepo = {
       })
       .where(eq(refreshTokens.id, tokenId));
   },
-  deleteUsedTokensSevenDays: async (timePriod: any) => {
+  deleteUsedTokensSevenDays: async (timePriodMs: number) => {
     await db
       .delete(refreshTokens)
       .where(
         and(
           eq(refreshTokens.used, true),
-          lt(refreshTokens.usedAt, new Date(Date.now() - timePriod)),
+          lt(refreshTokens.usedAt, new Date(Date.now() - timePriodMs)),
         ),
       );
+  },
+
+  deleteByUserId: async (userId: string) => {
+    await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+  },
+
+  markUsedAtomic: async (tokenId: string) => {
+    const result = await db
+      .update(refreshTokens)
+      .set({
+        used: true,
+        usedAt: new Date(),
+      })
+      .where(and(eq(refreshTokens.id, tokenId), eq(refreshTokens.used, false)));
+    return result;
   },
   deleteUsedTokensThirtyDays: async (timePeriod: any) => {
     await db

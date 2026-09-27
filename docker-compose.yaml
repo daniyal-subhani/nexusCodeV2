@@ -1,5 +1,19 @@
 name: nexusCoreV2
 services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: nexusCoreV2-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    env_file:
+      - .env
+    environment:
+      - RABBMQ_DEFAULT_USER: ${RABBMQ_DEFAULT_USER_NAME}
+      - RABBMQ_DEFAULT_PASS: ${RABBMQ_DEFAULT_PASSWORD}
+
+
+
   auth-db:
     image: mysql:9.0
     container_name: nexusCoreV2-auth-db

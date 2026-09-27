@@ -28,9 +28,10 @@ export const authRepository = {
       id: user.id,
       email: data.email,
       role: data.role ?? 'USER',
+      isVerified: false,
     };
   },
-  setEmailVarified: async (userId: string) => {
+  setEmailVerified: async (userId: string) => {
     await db
       .update(auth)
       .set({
@@ -38,9 +39,15 @@ export const authRepository = {
       })
       .where(eq(auth.id, userId));
   },
-  logout: async (userId: string) => {
-    await db.update(auth).set({ isActive: false }).where(eq(auth.id, userId));
+  deactivate: async (userId: string) => {
+    await db
+      .update(auth)
+      .set({
+        isActive: false,
+      })
+      .where(eq(auth.id, userId));
   },
+
   updatePassword: async (userId: string, newPass: string) => {
     await db
       .update(auth)
@@ -48,11 +55,5 @@ export const authRepository = {
         passwordHash: newPass,
       })
       .where(eq(auth.id, userId));
-  },
-  resetPassword: async () => {
-    // write here logic for sending user to verification code.
-  },
-  setNewPassword: async () => {
-    // write logic for setting up new password!
   },
 };

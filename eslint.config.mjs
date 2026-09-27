@@ -36,6 +36,7 @@ export default [
     },
     rules: {
       'no-undef': 'off',
+      'no-unused-vars': 'off',
       // 'no-console': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-module-boundary-types': 'off',

@@ -4,7 +4,7 @@ import { logger } from './logger';
 export const sendVerificationEmail = async (email: string, unhashedToken: string) => {
   const testAccount = await nodemailer.createTestAccount();
   const transpoter = await nodemailer.createTransport({
-    host: 'smtp.etherreal.email',
+    host: 'smtp.ethereal.email',
     port: 587,
     secure: false,
     auth: {

@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  int,
   mysqlEnum,
   mysqlTable,
   timestamp,
@@ -74,15 +75,19 @@ export const passwordResets = mysqlTable(
     userId: varchar('user_id', { length: 36 })
       .notNull()
       .references(() => auth.id, { onDelete: 'cascade' }),
-    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    otpHash: varchar('otp_hash', {length: 64}).notNull(),
+    otpAttempts: int('otp_attempts').default(0).notNull(),
+    otpVerified: boolean('otp_verified').default(false).notNull(),
+    resetTokenHash: varchar('reset_token_hash', { length: 64 }).notNull(),
     used: boolean('used').default(false).notNull(),
     expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
     createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   },
   (t) => ({
-    userIdx: index('password_reset_user_idx').on(t.userId),
-    tokenHashIdx: uniqueIndex('password_reset_hash_idx').on(t.tokenHash),
-    expiresIdx: index('password_reset_expires_idx').on(t.expiresAt),
+    userIdx: index('pr_user_idx').on(t.userId),
+    otpIdx: uniqueIndex('pr_reset_idx').on(t.otpHash),
+    resetTokenIdx: uniqueIndex('pr_reset_idx').on(t.resetTokenHash)
+
   }),
 );
 

@@ -1,8 +1,8 @@
 import cron from 'node-cron';
-import { refreshTokenRepo } from '@/repository/refreshToken.repository';
+import { refreshTokenRepo } from '@/repository/refreshToken.repo';
 import { logger } from '@/utils/logger';
-import { passwordRepository } from '@/repository/password.reset.repository';
-import { verificationEmailRepository } from '@/repository/verificationEmail.repository';
+import { passwordRepository } from '@/repository/passwordReset.repo';
+import { verificationEmailRepository } from '@/repository/emailVerification.repo';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
