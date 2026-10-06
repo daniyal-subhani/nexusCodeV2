@@ -50,7 +50,7 @@ export function Header() {
             asChild
             className="text-slate-700 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
           >
-            <Link href="/sign-in">Sign in</Link>
+            <Link href="/login">Log In</Link>
           </Button>
 
           <Button

@@ -9,7 +9,7 @@ import { BadRequestError, NotFoundError, UnauthorizedError, ValidationError } fr
 import crypto from 'crypto';
 import { db } from '@/db';
 import { auth } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
  const OTP_TTL_MS = 10 * 60 * 1000;
     const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;

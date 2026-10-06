@@ -1,15 +1,40 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import Link from 'next/link';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { loginSchema, type LoginInput } from '@/features/auth/schemas/auth.schema.types';
+import { useLogin } from '@/hooks/use-login';
+import { useQueryClient } from '@tanstack/react-query';
 
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-
-export default function SignUpPage() {
+export default function LogInPage() {
   const [showPassword, setShowPassword] = useState(false);
+
+  const form = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
+  const loginMutate = useLogin();
+  const queryClient = useQueryClient();
+
+  const onSubmit = async (data: LoginInput) => {
+    loginMutate.mutate(data, {
+      onSuccess: (response) => {
+        queryClient.setQueryData(['current-user'], response.user);
+        console.log(response);
+      },
+      onError: (error) => {
+        console.error(error);
+      },
+    });
+  };
 
   return (
     <main className="min-h-screen bg-white text-slate-950 transition-colors dark:bg-[#080B14] dark:text-white">
@@ -25,9 +50,7 @@ export default function SignUpPage() {
               Nexus<span className="text-violet-600 dark:text-violet-400">Core</span>
             </Link>
 
-            <h1 className="mt-8 text-3xl font-bold tracking-tight">
-              Login to your account
-            </h1>
+            <h1 className="mt-8 text-3xl font-bold tracking-tight">Login to your account</h1>
 
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
               Welcome back to NexusCore and get started.
@@ -36,7 +59,7 @@ export default function SignUpPage() {
 
           {/* Card */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/40 dark:border-white/10 dark:bg-[#0D111C] dark:shadow-black/20 sm:p-8">
-            <form className="space-y-5">
+            <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
               {/* Email */}
               <div className="space-y-2">
                 <label
@@ -51,12 +74,16 @@ export default function SignUpPage() {
 
                   <Input
                     id="email"
-                    name="email"
+                    // name="email"
                     type="email"
                     placeholder="you@example.com"
                     autoComplete="email"
+                    {...form.register('email')}
                     className="h-11 border-slate-200 bg-slate-50 pl-10 text-slate-950 placeholder:text-slate-400 focus-visible:ring-violet-500 dark:border-white/10 dark:bg-[#090C14] dark:text-white dark:placeholder:text-slate-600 dark:focus-visible:ring-violet-400"
                   />
+                  {form.formState.errors.email && (
+                    <p className="text-xs text-red-500">{form.formState.errors.email.message}</p>
+                  )}
                 </div>
               </div>
 
@@ -83,36 +110,36 @@ export default function SignUpPage() {
 
                   <Input
                     id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
+                    // name="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
-                    autoComplete="new-password"
+                    autoComplete="current-password"
+                    {...form.register('password')}
                     className="h-11 border-slate-200 bg-slate-50 pl-10 pr-10 text-slate-950 placeholder:text-slate-400 focus-visible:ring-violet-500 dark:border-white/10 dark:bg-[#090C14] dark:text-white dark:placeholder:text-slate-600 dark:focus-visible:ring-violet-400"
                   />
-
+                  {form.formState.errors.password && (
+                    <p className="text-xs text-red-500">
+                      {form.formState.errors.password?.message}
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={() => setShowPassword((current) => !current)}
-                    aria-label={
-                      showPassword ? "Hide password" : "Show password"
-                    }
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
                   >
-                    {showPassword ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </div>
               </div>
 
               {/* Submit */}
               <Button
+                disabled={loginMutate.isPending}
                 type="submit"
                 className="h-11 w-full bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
               >
-                Login
+                {loginMutate.isPending ? 'Logging in ...' : 'Login'}
               </Button>
             </form>
 
@@ -120,9 +147,7 @@ export default function SignUpPage() {
             <div className="my-6 flex items-center gap-4">
               <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
 
-              <span className="text-xs text-slate-400 dark:text-slate-500">
-                OR
-              </span>
+              <span className="text-xs text-slate-400 dark:text-slate-500">OR</span>
 
               <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
             </div>
@@ -138,7 +163,7 @@ export default function SignUpPage() {
 
             {/* Login */}
             <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-              {"Don't have an account?"}{" "}
+              {"Don't have an account?"}{' '}
               <Link
                 href="/sign-up"
                 className="font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
@@ -147,7 +172,6 @@ export default function SignUpPage() {
               </Link>
             </p>
           </div>
-
         </div>
       </div>
     </main>

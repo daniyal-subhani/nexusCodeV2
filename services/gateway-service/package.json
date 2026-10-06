@@ -8,7 +8,7 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "build": "tsup",
-    "dev": "tsup --watch"
+    "dev": "tsx watch src/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -16,12 +16,22 @@
   "type": "module",
   "dependencies": {
     "@nexus/common": "workspace:*",
+    "@types/cors": "^2.8.19",
+    "cors": "^2.8.6",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "http-proxy-middleware": "^4.2.0",
+    "jose": "^6.2.12",
     "pino": "^10.3.1",
+    "rate-limit-redis": "^6.0.1",
+    "redis": "^6.3.0",
     "tsup": "^8.5.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/node": "^22.20.2"
+    "@types/node": "^22.20.2",
+    "dotenv": "^17.4.2",
+    "tsx": "^4.23.13"
   }
 }

@@ -75,7 +75,7 @@ export const passwordResets = mysqlTable(
     userId: varchar('user_id', { length: 36 })
       .notNull()
       .references(() => auth.id, { onDelete: 'cascade' }),
-    otpHash: varchar('otp_hash', {length: 64}).notNull(),
+    otpHash: varchar('otp_hash', { length: 64 }).notNull(),
     otpAttempts: int('otp_attempts').default(0).notNull(),
     otpVerified: boolean('otp_verified').default(false).notNull(),
     resetTokenHash: varchar('reset_token_hash', { length: 64 }).notNull(),
@@ -86,8 +86,7 @@ export const passwordResets = mysqlTable(
   (t) => ({
     userIdx: index('pr_user_idx').on(t.userId),
     otpIdx: uniqueIndex('pr_reset_idx').on(t.otpHash),
-    resetTokenIdx: uniqueIndex('pr_reset_idx').on(t.resetTokenHash)
-
+    resetTokenIdx: uniqueIndex('pr_reset_idx').on(t.resetTokenHash),
   }),
 );
 
